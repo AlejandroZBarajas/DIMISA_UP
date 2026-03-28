@@ -6,4 +6,5 @@ import (
 
 type EntradaInterface interface {
 	CapturarEntrada(entrada *entradaEntity.EntradaRequest) error
+	CapturarInventario(inventario *entradaEntity.InventarioRequest) error
 }

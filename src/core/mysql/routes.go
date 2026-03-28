@@ -224,9 +224,12 @@ func RegisterRoutes(db *sql.DB) http.Handler {
 	// === ENTRADAS ===
 	entradasRepo := &entradasInfra.EntradasRepository{DB: db}
 	capturarEntradaUC := &entradasApp.CapturarEntradaUseCase{Repo: entradasRepo}
-	entradasController := entradasInfra.NewEntradaController(capturarEntradaUC)
+	capturarInventarioUC := &entradasApp.CapturarInventarioUseCase{Repo: entradasRepo}
 
-	mux.HandleFunc("/entradas/capturar", entradasController.CapturarEntrada) // POST
+	entradasController := entradasInfra.NewEntradaController(capturarEntradaUC, capturarInventarioUC)
+
+	mux.HandleFunc("/entradas/capturar", entradasController.CapturarEntrada)      // POST
+	mux.HandleFunc("/entradas/inventario", entradasController.CapturarInventario) // POST
 
 	log.Println("Rutas de entradas registradas")
 
