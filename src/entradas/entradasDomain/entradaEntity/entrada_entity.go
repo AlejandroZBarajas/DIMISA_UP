@@ -10,3 +10,8 @@ type EntradaRequest struct {
 	Id_colectivo int32            `json:"id_colectivo"`
 	Detalles     []DetalleEntrada `json:"detalles"`
 }
+
+type InventarioRequest struct {
+	Id_cendis int32            `json:"id_cendis"`
+	Detalles  []DetalleEntrada `json:"detalles"`
+}
