@@ -2,7 +2,7 @@ import sys
 
 
 # PRODUCCION:
-# docker exec -u root dimisa-mysql bash -c "apt-get update && apt-get install -y python3 python3-pip"
+# docker exec -u root dimisa-mysql bash -c "microdnf install -y python3 python3-pip"
 # docker cp CATALOGO.xlsx dimisa-mysql:/tmp/
 # docker cp cargar_medicamentos.py dimisa-mysql:/tmp/
 # docker exec dimisa-mysql pip3 install openpyxl mysql-connector-python
