@@ -67,7 +67,7 @@ func (r *EntradasRepository) CapturarInventario(inventario *entradaEntity.Invent
         INSERT INTO inventarios (id_cendis, id_medicamento, cantidad_actual, updated_at)
         VALUES %s
         ON DUPLICATE KEY UPDATE
-            cantidad_actual = VALUES(cantidad_actual),
+            cantidad_actual = cantidad_actual + VALUES(cantidad_actual),
             updated_at      = NOW()
     `, strings.Join(placeholders, ", "))
 
