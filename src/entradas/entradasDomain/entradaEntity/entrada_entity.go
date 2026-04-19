@@ -12,6 +12,7 @@ type EntradaRequest struct {
 }
 
 type InventarioRequest struct {
-	Id_cendis int32            `json:"id_cendis"`
-	Detalles  []DetalleEntrada `json:"detalles"`
+	Id_cendis  int32            `json:"id_cendis"`
+	Id_usuario int32            `json:"id_usuario"`
+	Detalles   []DetalleEntrada `json:"detalles"`
 }
