@@ -68,3 +68,8 @@ Error response from daemon: container c54eab699716c0114e172ac18d7d6b0190079fc19d
 Respaldo completado exitosamente: /home/informatica/DIMISA/DIMISA_API/backup_mysql.sql.gz
 Tamaño: 4,0K
 
+=== Respaldo iniciado: dom 19 abr 2026 17:30:01 CST ===
+mysqldump: [Warning] Using a password on the command line interface can be insecure.
+Respaldo completado exitosamente: /home/informatica/DIMISA/DIMISA_API/backup_mysql.sql.gz
+Tamaño: 888K
+

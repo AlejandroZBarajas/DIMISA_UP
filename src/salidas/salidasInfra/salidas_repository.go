@@ -13,7 +13,8 @@ type SalidasRepository struct {
 func NewSalidasRepository(db *sql.DB) *SalidasRepository {
 	return &SalidasRepository{DB: db}
 }
-func (repo *SalidasRepository) CreateSalida(salida *salidaEntity.SalidaEntity) (int32, error) {
+
+/* func (repo *SalidasRepository) CreateSalida(salida *salidaEntity.SalidaEntity) (int32, error) {
 	if len(salida.Claves) == 0 {
 		return 0, fmt.Errorf("la salida debe contener al menos un medicamento")
 	}
@@ -33,8 +34,8 @@ func (repo *SalidasRepository) CreateSalida(salida *salidaEntity.SalidaEntity) (
 	for _, detalle := range salida.Claves {
 		var cantidadActual int32
 		queryCheck := `
-			SELECT cantidad_actual 
-			FROM inventarios 
+			SELECT cantidad_actual
+			FROM inventarios
 			WHERE id_cendis = ? AND id_medicamento = ?
 		`
 		err = tx.QueryRow(queryCheck, salida.Id_cendis, detalle.Id_medicamento).Scan(&cantidadActual)
@@ -88,8 +89,8 @@ func (repo *SalidasRepository) CreateSalida(salida *salidaEntity.SalidaEntity) (
 	`
 
 	queryDescuento := `
-		UPDATE inventarios 
-		SET cantidad_actual = cantidad_actual - ?, 
+		UPDATE inventarios
+		SET cantidad_actual = cantidad_actual - ?,
 		    updated_at = CURDATE()
 		WHERE id_cendis = ? AND id_medicamento = ?
 	`
@@ -117,7 +118,7 @@ func (repo *SalidasRepository) CreateSalida(salida *salidaEntity.SalidaEntity) (
 	}
 
 	return salida.Id_salida, nil
-}
+} */
 
 func (repo *SalidasRepository) UpdateSalida(id_salida int32, salida *salidaEntity.SalidaEntity) error {
 
@@ -353,4 +354,160 @@ func (repo *SalidasRepository) CerrarSalida(id_salida int32) error {
 	}
 
 	return nil
+}
+
+func (repo *SalidasRepository) CreateSalida(salida *salidaEntity.SalidaEntity) (int32, error) {
+	if len(salida.Claves) == 0 {
+		return 0, fmt.Errorf("la salida debe contener al menos un medicamento")
+	}
+
+	tx, err := repo.DB.Begin()
+	if err != nil {
+		return 0, fmt.Errorf("error al iniciar transacción: %w", err)
+	}
+	defer tx.Rollback()
+
+	// 1. Obtener id_inventario
+	var idInventario int
+	err = tx.QueryRow(`
+		SELECT id_inventario 
+		FROM inventarios 
+		WHERE id_cendis = ?
+	`, salida.Id_cendis).Scan(&idInventario)
+
+	if err != nil {
+		return 0, fmt.Errorf("inventario no encontrado para cendis %d", salida.Id_cendis)
+	}
+
+	// 2. Validación acumulada con lock
+	type StockError struct {
+		IdMedicamento int32 `json:"id_medicamento"`
+		Disponible    int32 `json:"disponible"`
+		Solicitado    int32 `json:"solicitado"`
+	}
+
+	var errores []StockError
+
+	for _, detalle := range salida.Claves {
+		if detalle.Cantidad <= 0 {
+			return 0, fmt.Errorf("la cantidad debe ser mayor a 0 para el medicamento %d", detalle.Id_medicamento)
+		}
+
+		var disponible int32
+
+		err = tx.QueryRow(`
+			SELECT cantidad
+			FROM inventario_detalle
+			WHERE id_inventario = ? AND id_medicamento = ?
+			FOR UPDATE
+		`, idInventario, detalle.Id_medicamento).Scan(&disponible)
+
+		if err == sql.ErrNoRows {
+			errores = append(errores, StockError{
+				IdMedicamento: detalle.Id_medicamento,
+				Disponible:    0,
+				Solicitado:    detalle.Cantidad,
+			})
+			continue
+		}
+
+		if err != nil {
+			return 0, fmt.Errorf("error al verificar inventario: %w", err)
+		}
+
+		if disponible < detalle.Cantidad {
+			errores = append(errores, StockError{
+				IdMedicamento: detalle.Id_medicamento,
+				Disponible:    disponible,
+				Solicitado:    detalle.Cantidad,
+			})
+		}
+	}
+
+	// 3. Abortamos si hay errores
+	if len(errores) > 0 {
+		return 0, fmt.Errorf("stock insuficiente: %+v", errores)
+	}
+
+	// 4. Crear salida
+	querySalida := `
+		INSERT INTO salidas (id_area, id_cendis, id_usuario, fecha, editable, pendiente, tipo_id, created_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, NOW())
+	`
+
+	result, err := tx.Exec(
+		querySalida,
+		salida.Id_area,
+		salida.Id_cendis,
+		salida.Id_usuario,
+		salida.Fecha,
+		salida.Editable,
+		salida.Pendiente,
+		salida.Tipo_id,
+	)
+	if err != nil {
+		return 0, fmt.Errorf("error al crear salida: %w", err)
+	}
+
+	id, err := result.LastInsertId()
+	if err != nil {
+		return 0, fmt.Errorf("error al obtener id de salida: %w", err)
+	}
+
+	salida.Id_salida = int32(id)
+
+	// 5. Insertar detalles
+	queryDetalle := `
+		INSERT INTO salidas_detalle (id_salida, id_medicamento, cantidad)
+		VALUES (?, ?, ?)
+	`
+
+	for _, detalle := range salida.Claves {
+		_, err = tx.Exec(queryDetalle, salida.Id_salida, detalle.Id_medicamento, detalle.Cantidad)
+		if err != nil {
+			return 0, fmt.Errorf("error al insertar detalle de salida: %w", err)
+		}
+	}
+
+	// 6. Descontar inventario con protección
+	queryDescuento := `
+		UPDATE inventario_detalle
+		SET 
+			cantidad = cantidad - ?,
+			updated_at = CURRENT_TIMESTAMP,
+			updated_by = ?
+		WHERE 
+			id_inventario = ? 
+			AND id_medicamento = ?
+			AND cantidad >= ?
+	`
+
+	for _, detalle := range salida.Claves {
+		res, err := tx.Exec(
+			queryDescuento,
+			detalle.Cantidad,
+			salida.Id_usuario,
+			idInventario,
+			detalle.Id_medicamento,
+			detalle.Cantidad,
+		)
+		if err != nil {
+			return 0, fmt.Errorf("error al descontar inventario: %w", err)
+		}
+
+		rows, _ := res.RowsAffected()
+		if rows == 0 {
+			return 0, fmt.Errorf(
+				"conflicto concurrente al descontar medicamento %d",
+				detalle.Id_medicamento,
+			)
+		}
+	}
+
+	// 7. Commit
+	if err = tx.Commit(); err != nil {
+		return 0, fmt.Errorf("error al confirmar transacción: %w", err)
+	}
+
+	return salida.Id_salida, nil
 }
