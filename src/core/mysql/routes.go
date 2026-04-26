@@ -14,6 +14,8 @@ import (
 	"DIMISA/src/core/auth"
 	"DIMISA/src/entradas/entradasApp"
 	"DIMISA/src/entradas/entradasInfra"
+	"DIMISA/src/inventarioODT/inventariosApp"
+	"DIMISA/src/inventarioODT/inventariosInfra"
 	"DIMISA/src/salidas/salidasApp"
 	"DIMISA/src/salidas/salidasInfra"
 	"DIMISA/src/tipos_colectivo_salida/tiposApp"
@@ -247,6 +249,14 @@ func RegisterRoutes(db *sql.DB) http.Handler {
 	tiposController := tiposInfra.NewTiposController(getTiposUC)
 
 	mux.HandleFunc("/tipos", tiposController.GetTiposHandler) // GET
+
+	inventariosRepo := &inventariosInfra.InventariosRepository{DB: db}
+	getInventarioByCendisIDUC := &inventariosApp.GetInventarioByCendisID{Repo: inventariosRepo}
+	getAllInventariosUC := &inventariosApp.GetAllInventarios{Repo: inventariosRepo}
+	inventariosController := inventariosInfra.NewInventariosController(getInventarioByCendisIDUC, getAllInventariosUC)
+
+	mux.HandleFunc("/inventarios/cendis", inventariosController.GetInventarioByCendisID)
+	mux.HandleFunc("/inventarios/all", inventariosController.GetAllInventarios)
 
 	//handlerWithCors := corsMiddleware(mux)
 

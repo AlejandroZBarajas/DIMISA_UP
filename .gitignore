@@ -1,2 +1,5 @@
 .envvenv/
 .env
+palchat.txt
+refactor_db.txt
+backup.log
