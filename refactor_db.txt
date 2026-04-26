@@ -1,0 +1,119 @@
+# Desde el servidor, no dentro del contenedor
+docker exec <nombre_contenedor_db> mysqldump \
+  -u <usuario> -p<password> dimisa > backup_dimisa_$(date +%Y%m%d_%H%M%S).sql
+
+# Verificar que el backup no esté vacío
+ls -lh backup_dimisa_*.sql
+
+docker exec -it <nombre_contenedor_db> mysql -u <usuario> -p dimisa
+
+-- PASO 1: Backup interno por si acaso
+CREATE TABLE inventarios_backup AS SELECT * FROM inventarios;
+
+-- PASO 2: Limpiar huérfanos
+SET FOREIGN_KEY_CHECKS = 0;
+
+DELETE FROM inventarios
+WHERE id_cendis != 19
+   OR id_medicamento NOT IN (SELECT id_medicamento FROM medicamentos);
+
+SET FOREIGN_KEY_CHECKS = 1;
+
+-- Verificar que quedaron solo los válidos
+SELECT COUNT(*) FROM inventarios; -- debe ser 8
+
+-- PASO 3: Crear inventario_detalle
+CREATE TABLE inventario_detalle (
+  id_detalle      INT NOT NULL AUTO_INCREMENT,
+  id_inventario   INT NOT NULL,
+  id_medicamento  INT NOT NULL,
+  cantidad        INT NOT NULL,
+  updated_at      DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  updated_by      INT NOT NULL,
+  PRIMARY KEY (id_detalle),
+  UNIQUE KEY uq_detalle (id_detalle),
+  CONSTRAINT fk_det_inventario  FOREIGN KEY (id_inventario)  REFERENCES inventarios(id_inventario),
+  CONSTRAINT fk_det_medicamento FOREIGN KEY (id_medicamento) REFERENCES medicamentos(id_medicamento),
+  CONSTRAINT fk_det_usuario     FOREIGN KEY (updated_by)     REFERENCES usuarios(id_usuario)
+);
+
+ALTER TABLE inventario_detalle 
+  ADD UNIQUE (id_inventario, id_medicamento);
+
+-- PASO 4: Migrar datos a inventario_detalle ANTES de tocar inventarios
+INSERT INTO inventario_detalle
+  (id_inventario, id_medicamento, cantidad, updated_at, updated_by)
+SELECT
+  id_inventario,
+  id_medicamento,
+  cantidad_actual,
+  updated_at,
+  (SELECT MIN(id_usuario) FROM usuarios)
+FROM inventarios;
+
+-- Verificar migración
+SELECT COUNT(*) FROM inventario_detalle; -- debe ser 8
+
+-- PASO 5: Dropear índices y FK de inventarios
+ALTER TABLE inventarios DROP INDEX idx_cendis_medicamento;
+ALTER TABLE inventarios DROP FOREIGN KEY fk_inventario_medicamento;
+ALTER TABLE inventarios DROP INDEX idx_inventario_medicamento;
+
+-- PASO 6: Dropear columnas
+
+ALTER TABLE inventarios
+  DROP COLUMN id_medicamento,
+  DROP COLUMN cantidad_actual;
+
+ALTER TABLE inventarios 
+  ADD UNIQUE (id_cendis);
+
+-- PASO 7: Reestructurar inventarios (1 por cendis)
+-- Guardar los detalles antes del truncate
+CREATE TABLE inventario_detalle_backup AS SELECT * FROM inventario_detalle;
+
+TRUNCATE TABLE inventario_detalle;
+TRUNCATE TABLE inventarios;
+
+-- Insertar 1 registro por cendis activo
+INSERT INTO inventarios (id_cendis, updated_at)
+VALUES (19, CURDATE());
+
+-- PASO 8: Reinsertar detalles apuntando al nuevo id_inventario=1
+INSERT INTO inventario_detalle
+  (id_inventario, id_medicamento, cantidad, updated_at, updated_by)
+SELECT
+  1,
+  id_medicamento,
+  cantidad,
+  updated_at,
+  updated_by
+FROM inventario_detalle_backup;
+
+-- PASO 9: Verificación final
+SELECT
+  i.id_inventario,
+  c.cendis_nombre,
+  d.id_medicamento,
+  m.clave_med,
+  d.cantidad,
+  d.updated_at
+FROM inventario_detalle d
+JOIN inventarios i ON d.id_inventario = i.id_inventario
+JOIN cendis c ON i.id_cendis = c.id_cendis
+JOIN medicamentos m ON d.id_medicamento = m.id_medicamento;
+-- Debe devolver 8 filas todas con cendis=Urgencias
+
+
+
+EN CASO DE SALIR TODO BIEN, LIMPIAR LAS TABLAS 
+
+DROP TABLE inventarios_backup;
+DROP TABLE inventario_detalle_backup;
+
+
+SI ALGO FALLA, ROLLBACK
+
+# Desde el servidor, restaurar el backup externo
+docker exec -i <nombre_contenedor_db> mysql \
+  -u <usuario> -p<password> dimisa < backup_dimisa_<timestamp>.sql
