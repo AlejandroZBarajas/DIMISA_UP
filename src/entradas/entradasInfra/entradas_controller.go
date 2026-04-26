@@ -12,7 +12,9 @@ type EntradasController struct {
 	CapturarInventarioUC *entradasApp.CapturarInventarioUseCase
 }
 
-func NewEntradaController(capturar *entradasApp.CapturarEntradaUseCase, inventario *entradasApp.CapturarInventarioUseCase) *EntradasController {
+func NewEntradaController(
+	capturar *entradasApp.CapturarEntradaUseCase,
+	inventario *entradasApp.CapturarInventarioUseCase) *EntradasController {
 	return &EntradasController{
 		CapturarEntradaUC:    capturar,
 		CapturarInventarioUC: inventario,
