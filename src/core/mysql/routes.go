@@ -12,6 +12,8 @@ import (
 	"DIMISA/src/colectivos/colectivosApp"
 	"DIMISA/src/colectivos/colectivosInfra"
 	"DIMISA/src/core/auth"
+	"DIMISA/src/cpm/cpmApp"
+	"DIMISA/src/cpm/cpmInfra"
 	"DIMISA/src/entradas/entradasApp"
 	"DIMISA/src/entradas/entradasInfra"
 	"DIMISA/src/inventarioODT/inventariosApp"
@@ -258,6 +260,13 @@ func RegisterRoutes(db *sql.DB) http.Handler {
 	mux.HandleFunc("/inventarios/cendis", inventariosController.GetInventarioByCendisID)
 	mux.HandleFunc("/inventarios/all", inventariosController.GetAllInventarios)
 
+	cpmRepo := &cpmInfra.CpmRepository{DB: db}
+	getCpmUC := &cpmApp.GetCpm{Repo: cpmRepo}
+	cpmController := cpmInfra.NewCpmController(getCpmUC)
+
+	mux.HandleFunc("/cpm", cpmController.GetCpm) // GET
+
+	log.Println("Rutas de CPM registradas")
 	//handlerWithCors := corsMiddleware(mux)
 
 	//log.Fatal(http.ListenAndServe(":8080", handlerWithCors))
