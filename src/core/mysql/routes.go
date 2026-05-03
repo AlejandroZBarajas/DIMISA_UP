@@ -14,6 +14,8 @@ import (
 	"DIMISA/src/core/auth"
 	"DIMISA/src/cpm/cpmApp"
 	"DIMISA/src/cpm/cpmInfra"
+	"DIMISA/src/entradaColectivo/entradaColectivoApp"
+	"DIMISA/src/entradaColectivo/entradaColectivoInfra"
 	"DIMISA/src/entradas/entradasApp"
 	"DIMISA/src/entradas/entradasInfra"
 	"DIMISA/src/inventarioODT/inventariosApp"
@@ -100,7 +102,6 @@ func RegisterRoutes(db *sql.DB) http.Handler {
 		setFreeCamaUC,
 	)
 
-	// Rutas
 	mux.HandleFunc("/camas/create", camaController.CreateCamaHandler)         // POST
 	mux.HandleFunc("/camas/update", camaController.UpdateCamaHandler)         // PUT
 	mux.HandleFunc("/camas/delete", camaController.DeleteCamaHandler)         // DELETE
@@ -268,6 +269,25 @@ func RegisterRoutes(db *sql.DB) http.Handler {
 
 	log.Println("Rutas de CPM registradas")
 	//handlerWithCors := corsMiddleware(mux)
+
+	// === ENTRADAS COLECTIVO ===
+	entradaColectivoRepo := &entradaColectivoInfra.EntradaColectivoRepository{DB: db}
+
+	getReporteMensualUC := &entradaColectivoApp.GetReporteMensual{Repo: entradaColectivoRepo}
+	getDeficitCronicoUC := &entradaColectivoApp.GetDeficitCronico{Repo: entradaColectivoRepo}
+	getComparativoCendisUC := &entradaColectivoApp.GetComparativoCendis{Repo: entradaColectivoRepo}
+
+	entradaColectivoController := entradaColectivoInfra.NewEntradaColectivoController(
+		getReporteMensualUC,
+		getDeficitCronicoUC,
+		getComparativoCendisUC,
+	)
+
+	mux.HandleFunc("/entradas-colectivo/reporte-mensual", entradaColectivoController.GetReporteMensual) // POST
+	mux.HandleFunc("/entradas-colectivo/deficit-cronico", entradaColectivoController.GetDeficitCronico) // POST
+	mux.HandleFunc("/entradas-colectivo/comparativo", entradaColectivoController.GetComparativoCendis)  // POST
+
+	log.Println("Rutas de entradas colectivo registradas")
 
 	//log.Fatal(http.ListenAndServe(":8080", handlerWithCors))
 	log.Println("Servidor escuchando en :8080")
