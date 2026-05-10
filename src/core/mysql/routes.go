@@ -198,15 +198,19 @@ func RegisterRoutes(db *sql.DB) http.Handler {
 	log.Println(" Rutas de cendis registradas")
 
 	claveRepo := &clavesInfra.ClaveRepository{DB: db}
-	searchClaveUC := &clavesApp.SearchClave{Repo: claveRepo}
-	searchInventoryUC := &clavesApp.SearchInInventory{Repo: claveRepo}
+	searchMedClaveUC := &clavesApp.SearchMedClave{Repo: claveRepo}
+	searchMatClaveUC := &clavesApp.SearchMatClave{Repo: claveRepo}
+	searchMedInInventoryUC := &clavesApp.SearchMedInInventory{Repo: claveRepo}
+	searchMatInInventoryUC := &clavesApp.SearchMatInInventory{Repo: claveRepo}
 
-	claveController := clavesInfra.NewClaveController(searchClaveUC, searchInventoryUC)
+	claveController := clavesInfra.NewClaveController(searchMedClaveUC, searchMatClaveUC, searchMedInInventoryUC, searchMatInInventoryUC)
 
-	mux.HandleFunc("/medicamentos/search", claveController.SearchForClave)              // GET
-	mux.HandleFunc("/medicamentos/inventory/search", claveController.SearchInInventory) // GET
+	mux.HandleFunc("/claves/searchMed", claveController.SearchMedClave)                 // GET
+	mux.HandleFunc("/claves/searchMat", claveController.SearchMatClave)                 // GET
+	mux.HandleFunc("/claves/inventory/searchMed", claveController.SearchMedInInventory) // GET
+	mux.HandleFunc("/claves/inventory/searchMat", claveController.SearchMatInInventory) // GET
 
-	log.Println("Rutas de medicamentos registradas")
+	log.Println("Rutas de claves registradas")
 
 	colectivosRepo := &colectivosInfra.ColectivoRepository{DB: db}
 
