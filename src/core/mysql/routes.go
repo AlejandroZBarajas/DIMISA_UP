@@ -202,9 +202,13 @@ func RegisterRoutes(db *sql.DB) http.Handler {
 	searchMatClaveUC := &clavesApp.SearchMatClave{Repo: claveRepo}
 	searchMedInInventoryUC := &clavesApp.SearchMedInInventory{Repo: claveRepo}
 	searchMatInInventoryUC := &clavesApp.SearchMatInInventory{Repo: claveRepo}
+	searchAllInInventoryUC := &clavesApp.SearchAllInInventory{Repo: claveRepo}
+	searchAllClavesUC := &clavesApp.SearchAllClaves{Repo: claveRepo}
 
-	claveController := clavesInfra.NewClaveController(searchMedClaveUC, searchMatClaveUC, searchMedInInventoryUC, searchMatInInventoryUC)
+	claveController := clavesInfra.NewClaveController(searchMedClaveUC, searchMatClaveUC, searchMedInInventoryUC, searchMatInInventoryUC, searchAllInInventoryUC, searchAllClavesUC)
 
+	mux.HandleFunc("/claves/search", claveController.SearchAllClaves)                   // GET
+	mux.HandleFunc("/claves/inventory/search", claveController.SearchAllInInventory)    // GET
 	mux.HandleFunc("/claves/searchMed", claveController.SearchMedClave)                 // GET
 	mux.HandleFunc("/claves/searchMat", claveController.SearchMatClave)                 // GET
 	mux.HandleFunc("/claves/inventory/searchMed", claveController.SearchMedInInventory) // GET

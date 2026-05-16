@@ -184,3 +184,60 @@ func (r *ClaveRepository) scanClaves(query string, args []interface{}, withCanti
 
 	return claves, nil
 }
+
+func (r *ClaveRepository) SearchAllInInventory(s string, id int32) ([]*claveEntity.ClaveEntity, error) {
+	query := `
+		SELECT 
+			m.id_medicamento, 
+			m.clave_med, 
+			m.descripcion,
+			d.cantidad
+		FROM medicamentos m
+		INNER JOIN inventarios i 
+			ON i.id_cendis = ?
+		INNER JOIN inventario_detalle d 
+			ON d.id_inventario = i.id_inventario 
+			AND d.id_medicamento = m.id_medicamento
+		WHERE 
+			(m.clave_med LIKE ? OR m.descripcion LIKE ?)
+		ORDER BY 
+			CASE 
+				WHEN m.clave_med = ? THEN 1
+				WHEN m.clave_med LIKE ? THEN 2
+				ELSE 3
+			END,
+			m.clave_med
+		LIMIT 50
+	`
+
+	searchTerm := "%" + s + "%"
+	args := []interface{}{id, searchTerm, searchTerm, s, s + "%"}
+
+	return r.scanClaves(query, args, true)
+}
+
+func (r *ClaveRepository) SearchAllClaves(s string) ([]*claveEntity.ClaveEntity, error) {
+	query := `
+		SELECT 
+			id_medicamento, 
+			clave_med, 
+			descripcion
+		FROM medicamentos
+		WHERE 
+			clave_med LIKE ? 
+			OR descripcion LIKE ?
+		ORDER BY 
+			CASE 
+				WHEN clave_med = ? THEN 1
+				WHEN clave_med LIKE ? THEN 2
+				ELSE 3
+			END,
+			clave_med
+		LIMIT 50
+	`
+
+	searchTerm := "%" + s + "%"
+	args := []interface{}{searchTerm, searchTerm, s, s + "%"}
+
+	return r.scanClaves(query, args, false)
+}

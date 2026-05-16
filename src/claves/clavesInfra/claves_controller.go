@@ -14,6 +14,8 @@ type ClavesController struct {
 	searchMatUC            *clavesApp.SearchMatClave
 	SearchMedInInventoryUC *clavesApp.SearchMedInInventory
 	searchMatInInventoryUC *clavesApp.SearchMatInInventory
+	searchAllInInventoryUC *clavesApp.SearchAllInInventory
+	searchAllClavesUC      *clavesApp.SearchAllClaves
 }
 
 func NewClaveController(
@@ -21,12 +23,16 @@ func NewClaveController(
 	searchMat *clavesApp.SearchMatClave,
 	searchMedInInventory *clavesApp.SearchMedInInventory,
 	searchMatInInventory *clavesApp.SearchMatInInventory,
+	searchAllInInventory *clavesApp.SearchAllInInventory,
+	searchAllClaves *clavesApp.SearchAllClaves,
 ) *ClavesController {
 	return &ClavesController{
 		SearchMedUC:            searchMed,
 		searchMatUC:            searchMat,
 		SearchMedInInventoryUC: searchMedInInventory,
 		searchMatInInventoryUC: searchMatInInventory,
+		searchAllInInventoryUC: searchAllInInventory,
+		searchAllClavesUC:      searchAllClaves,
 	}
 }
 
@@ -174,4 +180,45 @@ func (c *ClavesController) SearchMatInInventory(w http.ResponseWriter, r *http.R
 
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(buildResponse(results, "No se encontró material de curación en el inventario"))
+}
+
+func (c *ClavesController) SearchAllInInventory(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	query, ok := parseSearchQuery(w, r)
+	if !ok {
+		return
+	}
+
+	cendisID, ok := parseCendisID(w, r)
+	if !ok {
+		return
+	}
+
+	results, err := c.searchAllInInventoryUC.Execute(query, cendisID)
+	if err != nil {
+		sendError(w, "Error al buscar en inventario: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(buildResponse(results, "No se encontraron resultados en el inventario"))
+}
+
+func (c *ClavesController) SearchAllClaves(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	query, ok := parseSearchQuery(w, r)
+	if !ok {
+		return
+	}
+
+	results, err := c.searchAllClavesUC.Execute(query)
+	if err != nil {
+		sendError(w, "Error al buscar claves: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(buildResponse(results, "No se encontraron resultados"))
 }

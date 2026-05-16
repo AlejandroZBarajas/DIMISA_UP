@@ -9,4 +9,6 @@ type ClaveInterface interface {
 	SearchMatClave(s string) ([]*claveEntity.ClaveEntity, error)
 	SearchMedInInventory(s string, id int32) ([]*claveEntity.ClaveEntity, error)
 	SearchMatInInventory(s string, id int32) ([]*claveEntity.ClaveEntity, error)
+	SearchAllInInventory(s string, id int32) ([]*claveEntity.ClaveEntity, error)
+	SearchAllClaves(s string) ([]*claveEntity.ClaveEntity, error)
 }
