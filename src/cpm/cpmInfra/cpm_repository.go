@@ -1,9 +1,11 @@
 package cpmInfra
 
 import (
+	"DIMISA/src/core/config"
 	cpmEntity "DIMISA/src/cpm/cpmDomain/cpmEntity"
 	"database/sql"
 	"math"
+	"strings"
 	"time"
 )
 
@@ -47,7 +49,6 @@ func (r *CpmRepository) GetCpm() (cpmEntity.CpmEntity, error) {
 	}
 	defer rows.Close()
 
-	// map[id_medicamento] -> *CpmDetalle en construcción
 	type key = int32
 	detallesMap := make(map[key]*cpmEntity.CpmDetalle)
 	var orden []key
@@ -76,7 +77,6 @@ func (r *CpmRepository) GetCpm() (cpmEntity.CpmEntity, error) {
 			orden = append(orden, idMed)
 		}
 
-		// ubica el mes correcto en el slice de 6
 		for i, m6 := range meses {
 			if m6.Mes == mes && m6.Anio == anio {
 				detallesMap[idMed].Meses[i].Consumo = consumo
@@ -88,8 +88,9 @@ func (r *CpmRepository) GetCpm() (cpmEntity.CpmEntity, error) {
 		return cpmEntity.CpmEntity{}, err
 	}
 
-	// calcular campos derivados
-	result := make([]cpmEntity.CpmDetalle, 0, len(orden))
+	medicamentos := make([]cpmEntity.CpmDetalle, 0)
+	material := make([]cpmEntity.CpmDetalle, 0)
+
 	for _, id := range orden {
 		d := detallesMap[id]
 
@@ -111,10 +112,17 @@ func (r *CpmRepository) GetCpm() (cpmEntity.CpmEntity, error) {
 		d.ConsumoDiario = round2(consumoDiario)
 		d.ConsumoMensual = round2(consumoMensual)
 
-		result = append(result, *d)
+		if esMedicamento(d.Clave) {
+			medicamentos = append(medicamentos, *d)
+		} else {
+			material = append(material, *d)
+		}
 	}
 
-	return cpmEntity.CpmEntity{Detalles: result}, nil
+	return cpmEntity.CpmEntity{
+		Medicamentos: medicamentos,
+		Material:     material,
+	}, nil
 }
 
 // ---------- helpers ----------
@@ -160,4 +168,18 @@ func inicializarMeses(meses []mesAnio) []cpmEntity.DetalleMes {
 
 func round2(v float64) float64 {
 	return math.Round(v*100) / 100
+}
+
+func esMedicamento(clave string) bool {
+	for _, prefix := range config.MedPrefixes {
+		if strings.HasPrefix(clave, prefix) {
+			return true
+		}
+	}
+	for _, exact := range config.MedExactKeys {
+		if clave == exact {
+			return true
+		}
+	}
+	return false
 }

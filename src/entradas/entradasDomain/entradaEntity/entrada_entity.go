@@ -1,8 +1,9 @@
 package entradaEntity
 
 type DetalleEntrada struct {
-	Id_medicamento int32 `json:"id_medicamento"`
-	Cantidad       int32 `json:"cantidad"`
+	Id_medicamento  int32 `json:"id_medicamento"`
+	Cantidad        int32 `json:"cantidad"`
+	PiezasEsperadas int32 `json:"piezas_esperadas"`
 }
 
 type EntradaRequest struct {

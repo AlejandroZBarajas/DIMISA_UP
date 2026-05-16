@@ -21,5 +21,6 @@ type CpmDetalle struct {
 }
 
 type CpmEntity struct {
-	Detalles []CpmDetalle `json:"detalles"`
+	Medicamentos []CpmDetalle `json:"medicamentos"`
+	Material     []CpmDetalle `json:"material"`
 }
