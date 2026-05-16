@@ -5,6 +5,10 @@ import (
 )
 
 type ClaveInterface interface {
-	SearchClave(s string) ([]*claveEntity.ClaveEntity, error)
-	SearchInInventory(s string, id int32) ([]*claveEntity.ClaveEntity, error)
+	SearchMedClave(s string) ([]*claveEntity.ClaveEntity, error)
+	SearchMatClave(s string) ([]*claveEntity.ClaveEntity, error)
+	SearchMedInInventory(s string, id int32) ([]*claveEntity.ClaveEntity, error)
+	SearchMatInInventory(s string, id int32) ([]*claveEntity.ClaveEntity, error)
+	SearchAllInInventory(s string, id int32) ([]*claveEntity.ClaveEntity, error)
+	SearchAllClaves(s string) ([]*claveEntity.ClaveEntity, error)
 }

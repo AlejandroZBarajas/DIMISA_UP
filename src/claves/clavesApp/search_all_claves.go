@@ -5,10 +5,10 @@ import (
 	claveEntity "DIMISA/src/claves/clavesDomain/entity"
 )
 
-type SearchClave struct {
+type SearchAllClaves struct {
 	Repo clavesDomain.ClaveInterface
 }
 
-func (uc *SearchClave) Execute(s string) ([]*claveEntity.ClaveEntity, error) {
-	return uc.Repo.SearchClave(s)
+func (uc *SearchAllClaves) Execute(s string) ([]*claveEntity.ClaveEntity, error) {
+	return uc.Repo.SearchAllClaves(s)
 }

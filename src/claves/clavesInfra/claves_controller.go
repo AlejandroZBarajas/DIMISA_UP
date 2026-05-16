@@ -4,23 +4,35 @@ import (
 	"DIMISA/src/claves/clavesApp"
 	claveEntity "DIMISA/src/claves/clavesDomain/entity"
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
 )
 
 type ClavesController struct {
-	SearchUC          *clavesApp.SearchClave
-	SearchInventoryUC *clavesApp.SearchInInventory
+	SearchMedUC            *clavesApp.SearchMedClave
+	searchMatUC            *clavesApp.SearchMatClave
+	SearchMedInInventoryUC *clavesApp.SearchMedInInventory
+	searchMatInInventoryUC *clavesApp.SearchMatInInventory
+	searchAllInInventoryUC *clavesApp.SearchAllInInventory
+	searchAllClavesUC      *clavesApp.SearchAllClaves
 }
 
 func NewClaveController(
-	search *clavesApp.SearchClave,
-	searchInventory *clavesApp.SearchInInventory) *ClavesController {
+	searchMed *clavesApp.SearchMedClave,
+	searchMat *clavesApp.SearchMatClave,
+	searchMedInInventory *clavesApp.SearchMedInInventory,
+	searchMatInInventory *clavesApp.SearchMatInInventory,
+	searchAllInInventory *clavesApp.SearchAllInInventory,
+	searchAllClaves *clavesApp.SearchAllClaves,
+) *ClavesController {
 	return &ClavesController{
-		SearchUC:          search,
-		SearchInventoryUC: searchInventory,
+		SearchMedUC:            searchMed,
+		searchMatUC:            searchMat,
+		SearchMedInInventoryUC: searchMedInInventory,
+		searchMatInInventoryUC: searchMatInInventory,
+		searchAllInInventoryUC: searchAllInInventory,
+		searchAllClavesUC:      searchAllClaves,
 	}
 }
 
@@ -31,47 +43,7 @@ type SearchResponse struct {
 	Count   int                        `json:"count"`
 }
 
-// SearchForClave maneja búsquedas con GET /medicamentos/search?q=query
-func (c *ClavesController) SearchForClave(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-	fmt.Println("entra al backend")
-	if r.Method != http.MethodGet {
-		sendError(w, "Método no permitido", http.StatusMethodNotAllowed)
-		return
-	}
-
-	query := r.URL.Query().Get("q")
-	query = strings.TrimSpace(query)
-
-	if query == "" {
-		sendError(w, "El parámetro 'q' es requerido", http.StatusBadRequest)
-		return
-	}
-
-	if len(query) < 2 {
-		sendError(w, "La búsqueda debe tener al menos 2 caracteres", http.StatusBadRequest)
-		return
-	}
-
-	results, err := c.SearchUC.Execute(query)
-	if err != nil {
-		sendError(w, "Error al buscar medicamentos: "+err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	response := SearchResponse{
-		Success: true,
-		Data:    results,
-		Count:   len(results),
-	}
-
-	if len(results) == 0 {
-		response.Message = "No se encontraron medicamentos"
-	}
-
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(response)
-}
+// ─── HELPERS ─────────────────────────────────────────────────────────────────
 
 func sendError(w http.ResponseWriter, message string, statusCode int) {
 	w.WriteHeader(statusCode)
@@ -82,51 +54,171 @@ func sendError(w http.ResponseWriter, message string, statusCode int) {
 	})
 }
 
-func (c *ClavesController) SearchInInventory(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-
-	if r.Method != http.MethodGet {
-		sendError(w, "Método no permitido", http.StatusMethodNotAllowed)
-		return
-	}
-
+// parseSearchQuery extrae y valida el parámetro q
+func parseSearchQuery(w http.ResponseWriter, r *http.Request) (string, bool) {
 	query := strings.TrimSpace(r.URL.Query().Get("q"))
 	if query == "" {
 		sendError(w, "El parámetro 'q' es requerido", http.StatusBadRequest)
-		return
+		return "", false
 	}
 	if len(query) < 2 {
 		sendError(w, "La búsqueda debe tener al menos 2 caracteres", http.StatusBadRequest)
-		return
+		return "", false
 	}
+	return query, true
+}
 
+// parseCendisID extrae y valida el parámetro cendis
+func parseCendisID(w http.ResponseWriter, r *http.Request) (int32, bool) {
 	cendisStr := r.URL.Query().Get("cendis")
 	if cendisStr == "" {
 		sendError(w, "El parámetro 'cendis' es requerido", http.StatusBadRequest)
-		return
+		return 0, false
 	}
-
-	cendisID, err := strconv.Atoi(cendisStr)
-	if err != nil || cendisID <= 0 {
+	id, err := strconv.Atoi(cendisStr)
+	if err != nil || id <= 0 {
 		sendError(w, "El parámetro 'cendis' debe ser un número válido", http.StatusBadRequest)
-		return
+		return 0, false
 	}
+	return int32(id), true
+}
 
-	results, err := c.SearchInventoryUC.Execute(query, int32(cendisID))
-	if err != nil {
-		sendError(w, "Error al buscar en inventario: "+err.Error(), http.StatusInternalServerError)
-		return
-	}
-
+// buildResponse arma el SearchResponse estándar
+func buildResponse(results []*claveEntity.ClaveEntity, emptyMsg string) SearchResponse {
 	response := SearchResponse{
 		Success: true,
 		Data:    results,
 		Count:   len(results),
 	}
 	if len(results) == 0 {
-		response.Message = "No se encontraron medicamentos en el inventario"
+		response.Message = emptyMsg
+	}
+	return response
+}
+
+// ─── MEDICAMENTOS ────────────────────────────────────────────────────────────
+
+func (c *ClavesController) SearchMedClave(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	query, ok := parseSearchQuery(w, r)
+	if !ok {
+		return
+	}
+
+	results, err := c.SearchMedUC.Execute(query)
+	if err != nil {
+		sendError(w, "Error al buscar medicamentos: "+err.Error(), http.StatusInternalServerError)
+		return
 	}
 
 	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(response)
+	json.NewEncoder(w).Encode(buildResponse(results, "No se encontraron medicamentos"))
+}
+
+func (c *ClavesController) SearchMedInInventory(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	query, ok := parseSearchQuery(w, r)
+	if !ok {
+		return
+	}
+
+	cendisID, ok := parseCendisID(w, r)
+	if !ok {
+		return
+	}
+
+	results, err := c.SearchMedInInventoryUC.Execute(query, cendisID)
+	if err != nil {
+		sendError(w, "Error al buscar medicamentos en inventario: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(buildResponse(results, "No se encontraron medicamentos en el inventario"))
+}
+
+// ─── MATERIAL DE CURACION ────────────────────────────────────────────────────
+
+func (c *ClavesController) SearchMatClave(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	query, ok := parseSearchQuery(w, r)
+	if !ok {
+		return
+	}
+
+	results, err := c.searchMatUC.Execute(query)
+	if err != nil {
+		sendError(w, "Error al buscar material de curación: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(buildResponse(results, "No se encontró material de curación"))
+}
+
+func (c *ClavesController) SearchMatInInventory(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	query, ok := parseSearchQuery(w, r)
+	if !ok {
+		return
+	}
+
+	cendisID, ok := parseCendisID(w, r)
+	if !ok {
+		return
+	}
+
+	results, err := c.searchMatInInventoryUC.Execute(query, cendisID)
+	if err != nil {
+		sendError(w, "Error al buscar material de curación en inventario: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(buildResponse(results, "No se encontró material de curación en el inventario"))
+}
+
+func (c *ClavesController) SearchAllInInventory(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	query, ok := parseSearchQuery(w, r)
+	if !ok {
+		return
+	}
+
+	cendisID, ok := parseCendisID(w, r)
+	if !ok {
+		return
+	}
+
+	results, err := c.searchAllInInventoryUC.Execute(query, cendisID)
+	if err != nil {
+		sendError(w, "Error al buscar en inventario: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(buildResponse(results, "No se encontraron resultados en el inventario"))
+}
+
+func (c *ClavesController) SearchAllClaves(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	query, ok := parseSearchQuery(w, r)
+	if !ok {
+		return
+	}
+
+	results, err := c.searchAllClavesUC.Execute(query)
+	if err != nil {
+		sendError(w, "Error al buscar claves: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(buildResponse(results, "No se encontraron resultados"))
 }
