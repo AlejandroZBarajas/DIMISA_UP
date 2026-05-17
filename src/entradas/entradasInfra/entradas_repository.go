@@ -208,12 +208,14 @@ func (r *EntradasRepository) actualizarPiezasEsperadas(tx *sql.Tx, entrada *entr
 
 func (r *EntradasRepository) insertarEntradasColectivo(tx *sql.Tx, entrada *entradaEntity.EntradaRequest) error {
 	recibido := make(map[int32]int32, len(entrada.Detalles))
+	esperado := make(map[int32]int32, len(entrada.Detalles)) // ← nuevo
 	for _, d := range entrada.Detalles {
 		recibido[d.Id_medicamento] += d.Cantidad
+		esperado[d.Id_medicamento] = d.PiezasEsperadas // ← del payload
 	}
 
 	rows, err := tx.Query(`
-        SELECT id_medicamento, cantidad FROM colectivo_detalle WHERE id_colectivo = ?
+        SELECT id_medicamento FROM colectivo_detalle WHERE id_colectivo = ?
     `, entrada.Id_colectivo)
 	if err != nil {
 		return fmt.Errorf("SELECT colectivo_detalle: %w", err)
@@ -224,12 +226,18 @@ func (r *EntradasRepository) insertarEntradasColectivo(tx *sql.Tx, entrada *entr
 	args := make([]interface{}, 0)
 
 	for rows.Next() {
-		var idMed, solicitada int32
-		if err := rows.Scan(&idMed, &solicitada); err != nil {
+		var idMed int32
+		if err := rows.Scan(&idMed); err != nil {
 			return fmt.Errorf("Scan colectivo_detalle: %w", err)
 		}
 		placeholders = append(placeholders, "(?, ?, ?, ?, ?)")
-		args = append(args, entrada.Id_colectivo, entrada.Id_cendis, idMed, solicitada, recibido[idMed])
+		args = append(args,
+			entrada.Id_colectivo,
+			entrada.Id_cendis,
+			idMed,
+			esperado[idMed], // ← piezas esperadas del payload
+			recibido[idMed],
+		)
 	}
 	if err := rows.Err(); err != nil {
 		return fmt.Errorf("rows.Err colectivo_detalle: %w", err)
@@ -244,7 +252,9 @@ func (r *EntradasRepository) insertarEntradasColectivo(tx *sql.Tx, entrada *entr
         INSERT INTO entradas_colectivo
             (id_colectivo, id_cendis, id_medicamento, cantidad_solicitada, cantidad_recibida)
         VALUES %s
-        ON DUPLICATE KEY UPDATE cantidad_recibida = VALUES(cantidad_recibida)
+        ON DUPLICATE KEY UPDATE
+            cantidad_solicitada = VALUES(cantidad_solicitada),
+            cantidad_recibida   = VALUES(cantidad_recibida)
     `, strings.Join(placeholders, ", ")), args...)
 	if err != nil {
 		return fmt.Errorf("bulk insert entradas_colectivo: %w", err)

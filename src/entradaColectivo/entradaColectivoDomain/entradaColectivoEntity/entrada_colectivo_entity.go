@@ -7,10 +7,10 @@ type EntradaColectivoDetalle struct {
 	IdMedicamento      int32  `json:"id_medicamento"`
 	Clave              string `json:"clave"`
 	Descripcion        string `json:"descripcion"`
-	CantidadSolicitada int32  `json:"cantidad_solicitada"`
+	PiezasEsperadas    int32  `json:"piezas_esperadas"`
 	CantidadRecibida   int32  `json:"cantidad_recibida"`
 	Deficit            int32  `json:"deficit"`
-	Estatus            string `json:"estatus"` // "Completo" | "Parcial" | "No surtido"
+	Estatus            string `json:"estatus"`
 	Mes                int    `json:"mes"`
 	Anio               int    `json:"anio"`
 }
