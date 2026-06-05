@@ -51,7 +51,9 @@ func RegisterRoutes(db *sql.DB) http.Handler {
 	mux := http.NewServeMux()
 
 	loginHandler := &auth.LoginHandler{DB: db}
+	registerHandler := &auth.RegisterHandler{DB: db}
 	mux.Handle("/login", loginHandler)
+	mux.Handle("/register", registerHandler)
 	log.Println("Ruta de login registrada")
 
 	userRepo := &userInfra.UserRepository{DB: db}

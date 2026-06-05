@@ -1,0 +1,73 @@
+services:
+
+  mysql:
+    image: mysql:8.4
+
+    container_name: dimisa-mysql
+    restart: always
+
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: dimisa
+
+    ports:
+      - "3306:3306"
+
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./dimisa_dump.sql:/docker-entrypoint-initdb.d/01-dump.sql
+
+    networks:
+      - dimisa-network
+
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-proot"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build: .
+
+    container_name: dimisa-api
+
+    restart: always
+
+    env_file:
+      - .env
+
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+    ports:
+      - "8080:8080"
+
+    networks:
+      - dimisa-network
+
+  nginx:
+    image: nginx:alpine
+
+    container_name: dimisa-nginx
+
+    restart: always
+    
+    depends_on:
+      - api
+
+    ports:
+      - "80:80"
+
+    volumes:
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf
+
+    networks:
+      - dimisa-network
+
+volumes:
+  mysql_data:
+
+networks:
+  dimisa-network:
+    driver: bridge
