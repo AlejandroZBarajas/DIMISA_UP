@@ -48,19 +48,16 @@ services:
 
   nginx:
     image: nginx:alpine
-
     container_name: dimisa-nginx
-
     restart: always
-    
-    depends_on:
-      - api
-
     ports:
       - "80:80"
-
+      - "443:443"
     volumes:
-      - ./nginx.conf:/etc/nginx/conf.d/default.conf
+      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf
+      - /etc/cloudflare/certs:/etc/nginx/certs:ro
+    depends_on:
+      - api
 
     networks:
       - dimisa-network
